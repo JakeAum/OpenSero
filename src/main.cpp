@@ -1,28 +1,75 @@
 #include <Arduino.h>
 
-// Define the GPIO pin for the button
-#define BUTTON_PIN_1 12 
-#define BUTTON_PIN_2 14 
+// Define the GPIO pins
+#define BUTTON_PIN_1 12
+#define BUTTON_PIN_2 14
+#define ROT_POT_1 13
+#define MOTOR_OUT_1 22
+#define MOTOR_OUT_2 23
+
+// PWM properties
+#define PWM_FREQ 5000
+#define PWM_RESOLUTION 8
+#define PWM_CHANNEL_1 0
+#define PWM_CHANNEL_2 1
+
+// Global variables
+int dutyCycle = 0;
 
 void setup() {
   Serial.begin(115200);
-
-  pinMode(BUTTON_PIN_1, INPUT);
-  pinMode(BUTTON_PIN_2, INPUT);
+  
+  // Set pin modes
+  pinMode(BUTTON_PIN_1, INPUT_PULLUP);
+  pinMode(BUTTON_PIN_2, INPUT_PULLUP);
+  pinMode(ROT_POT_1, INPUT);
+  
+  // Configure PWM for both motor control pins
+  ledcSetup(PWM_CHANNEL_1, PWM_FREQ, PWM_RESOLUTION);
+  ledcSetup(PWM_CHANNEL_2, PWM_FREQ, PWM_RESOLUTION);
+  ledcAttachPin(MOTOR_OUT_1, PWM_CHANNEL_1);
+  ledcAttachPin(MOTOR_OUT_2, PWM_CHANNEL_2);
+  
+  // Initialize motor pins to LOW (motor off)
+  ledcWrite(PWM_CHANNEL_1, 0);
+  ledcWrite(PWM_CHANNEL_2, 0);
 }
 
 void loop() {
-
-  int b1 = digitalRead(BUTTON_PIN_1);
-  int b2 = digitalRead(BUTTON_PIN_2);
-
-  Serial.print(b1);
-  Serial.print(" ");
-  Serial.println(b2);
-  delayMicroseconds(10);
-
+  // Read buttons (active low due to INPUT_PULLUP)
+  bool button1Pressed = !digitalRead(BUTTON_PIN_1);
+  bool button2Pressed = !digitalRead(BUTTON_PIN_2);
+  
+  // Read potentiometer and map to duty cycle (0-255)
+  int potValue = analogRead(ROT_POT_1);
+  dutyCycle = map(potValue, 0, 4095, 0, 255);
+  
+  // Motor control logic
+  if (button1Pressed && !button2Pressed) {
+    // Forward direction
+    ledcWrite(PWM_CHANNEL_1, dutyCycle);
+    ledcWrite(PWM_CHANNEL_2, 0);
+    Serial.println("Motor Forward");
+  } else if (button2Pressed && !button1Pressed) {
+    // Reverse direction
+    ledcWrite(PWM_CHANNEL_1, 0);
+    ledcWrite(PWM_CHANNEL_2, dutyCycle);
+    Serial.println("Motor Reverse");
+  } else {
+    // Stop motor when no button is pressed or both are pressed
+    ledcWrite(PWM_CHANNEL_1, 0);
+    ledcWrite(PWM_CHANNEL_2, 0);
+    Serial.println("Motor OFF");
+  }
+  
+  // Print debug information
+  Serial.print("Potentiometer: ");
+  Serial.print(potValue);
+  Serial.print(", Duty Cycle: ");
+  Serial.println(dutyCycle);
+  
+  delay(100);  // Small delay to prevent serial flooding
 }
-
 
 // Write all GPIO Pins available on an ESP-32 Devkit 
 // =======================================================|
